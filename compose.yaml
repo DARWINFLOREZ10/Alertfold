@@ -1,0 +1,25 @@
+services:
+  api:
+    build: .
+    environment:
+      RELAYOPS_DB: /app/data/relayops.db
+    ports:
+      - "8000:8000"
+    volumes:
+      - relayops-data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+  worker:
+    build: .
+    command: ["python", "-m", "relayops.cli", "worker"]
+    environment:
+      RELAYOPS_DB: /app/data/relayops.db
+    volumes:
+      - relayops-data:/app/data
+    depends_on:
+      - api
+volumes:
+  relayops-data:
