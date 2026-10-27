@@ -59,6 +59,45 @@ def test_auth_tenant_isolation_and_state_conflict(context):
     assert ingest(client, external_id="e3").json()["incident_id"] != incident_id
 
 
+def test_requeue_dead_letter_is_tenant_scoped_and_body_is_capped(context):
+    client, db = context
+    ingest(client)
+    with db.connect() as conn:
+        message_id = conn.execute("SELECT id FROM outbox").fetchone()[0]
+    with db.transaction() as conn:
+        conn.execute("UPDATE outbox SET status='dead', attempts=5 WHERE id=?", (message_id,))
+        conn.execute(
+            "INSERT INTO api_keys VALUES (?,?,?)",
+            (hashlib.sha256(b"t2admin").hexdigest(), "t2", "admin"),
+        )
+    assert client.post(f"/v1/outbox/{message_id}/requeue", headers=auth("t2", "viewer")).status_code == 403
+    assert client.post(f"/v1/outbox/{message_id}/requeue", headers={"Authorization": "Bearer t2admin"}).status_code == 404
+    response = client.post(f"/v1/outbox/{message_id}/requeue", headers=auth())
+    assert response.status_code == 200
+    assert response.json() == {"id": message_id, "status": "pending"}
+    from relayops.worker import dispatch_one
+
+    assert dispatch_one(db, lambda _message_id, _payload: None)
+    with db.connect() as conn:
+        assert conn.execute("SELECT status FROM outbox WHERE id=?", (message_id,)).fetchone()[0] == "delivered"
+        assert conn.execute("SELECT action FROM audit WHERE detail=?", (message_id,)).fetchone()[0] == "outbox_requeued"
+    assert client.post(f"/v1/outbox/{message_id}/requeue", headers=auth()).status_code == 409
+
+    oversized = b"x" * 65537
+    capped = client.post(
+        "/v1/services/s1/events",
+        content=oversized,
+        headers={"X-Relay-Signature": "sha256=00", "Content-Type": "application/json"},
+    )
+    assert capped.status_code == 413
+    at_limit = client.post(
+        "/v1/services/s1/events",
+        content=b"y" * 65536,
+        headers={"X-Relay-Signature": "sha256=00", "Content-Type": "application/json"},
+    )
+    assert at_limit.status_code == 401
+
+
 def test_service_permissions(context):
     client, _ = context
     assert client.post("/v1/services", json={"name": "Billing"}, headers=auth("t2", "viewer")).status_code == 403
