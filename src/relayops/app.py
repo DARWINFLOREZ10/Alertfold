@@ -148,6 +148,28 @@ def create_app(database_path: str | None = None) -> FastAPI:
             conn.execute("INSERT INTO outbox VALUES (?,?,?,?,?,?,?,?,?,?)", (new_id(), user["tenant_id"], incident_id, "incident_" + target, json.dumps({"incident_id": incident_id}), "pending", 0, timestamp, timestamp, None))
         return {"id": incident_id, "status": target, "version": body.version + 1}
 
+    @app.post("/v1/outbox/{message_id}/requeue")
+    def requeue(message_id: str, user: dict = Depends(require("admin"))):
+        timestamp = now()
+        with db.transaction() as conn:
+            row = conn.execute(
+                "SELECT status, incident_id FROM outbox WHERE id=? AND tenant_id=?",
+                (message_id, user["tenant_id"]),
+            ).fetchone()
+            if row is None:
+                raise HTTPException(404, "Message not found")
+            if row["status"] != "dead":
+                raise HTTPException(409, "Only dead messages can be requeued")
+            conn.execute(
+                "UPDATE outbox SET status='pending', attempts=0, due_at=?, delivered_at=NULL WHERE id=? AND tenant_id=? AND status='dead'",
+                (timestamp, message_id, user["tenant_id"]),
+            )
+            conn.execute(
+                "INSERT INTO audit(tenant_id,incident_id,actor,action,occurred_at,detail) VALUES (?,?,?,?,?,?)",
+                (user["tenant_id"], row["incident_id"], user["role"], "outbox_requeued", timestamp, message_id),
+            )
+        return {"id": message_id, "status": "pending"}
+
     @app.get("/v1/incidents/{incident_id}/audit")
     def audit(incident_id: str, user: dict = Depends(require("viewer"))):
         with db.connect() as conn:
