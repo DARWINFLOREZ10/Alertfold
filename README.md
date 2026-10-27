@@ -1,8 +1,8 @@
-# RelayOps
+# Alertfold
 
-Incident intake for alerts that arrive more than once. The service deduplicates events, groups a storm into one open incident, and records a notification intent in the same transaction as the incident.
+Incident intake for alerts that arrive more than once. I deduplicate events, group a storm into one open incident, and record a notification intent in the same transaction as the incident.
 
-**Status:** portfolio project. One host, SQLite, a log-only delivery adapter. Not a production on-call platform.
+**Status:** I built this as a portfolio system. One host, SQLite, a log-only delivery adapter. It is not a production on-call platform.
 
 ## Problem
 

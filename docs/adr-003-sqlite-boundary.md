@@ -2,7 +2,7 @@
 
 ## Context
 
-RelayOps has to stay runnable with one command, and the invariants under test are about transactions, not about a fleet. PostgreSQL would be the right database for more than one API or worker process. Pretending this repository already is that deployment would hide the limit.
+Alertfold has to stay runnable with one command, and the invariants under test are about transactions, not about a fleet. PostgreSQL would be the right database for more than one API or worker process. Pretending this repository already is that deployment would hide the limit.
 
 ## Decision
 
