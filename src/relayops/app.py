@@ -36,7 +36,7 @@ class TransitionIn(BaseModel):
 
 
 def create_app(database_path: str | None = None) -> FastAPI:
-    app = FastAPI(title="RelayOps API", version="0.1.0")
+    app = FastAPI(title="Alertfold", version="0.1.0")
     db = Database(database_path or os.getenv("RELAYOPS_DB", "data/relayops.db"))
     app.state.db = db
 

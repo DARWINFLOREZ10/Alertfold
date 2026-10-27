@@ -10,7 +10,7 @@ from .worker import run
 
 
 def main():
-    parser = argparse.ArgumentParser(description="RelayOps administration")
+    parser = argparse.ArgumentParser(description="Alertfold administration")
     parser.add_argument("command", choices=["bootstrap", "worker"])
     parser.add_argument("--tenant", default="demo")
     args = parser.parse_args()
